@@ -8,221 +8,104 @@ from pathlib import Path
 
 WORKDIR = Path(__file__).parent
 
+
 class CatalogEditor:
     def __init__(self):
         self.base_image = None
         self.overlays = []
         self.selected_feature = None
-        self.selected_category = "beard"
-        self.current_scale = 1.0
+        self.selected_category = "eyes"
+        self.current_scale = 0.2
         self.current_rotation = 0
         self.current_opacity = 1.0
         self.feature_catalog = {}
-        self.preview_overlay = None  # For showing preview before confirming
+        self.preview_overlay = None
         self.init_feature_catalog()
 
-    def init_feature_catalog(self):
-        """Initialize catalog with multiple variations for each feature type"""
+    def add_to_catalog(self, category: str, folder: Path):
+        self.feature_catalog[category] = {}
+        if folder.exists():
+            for img_file in folder.glob("*.png"):
+                try:
+                    # Use filename without extension as the label
+                    name = img_file.stem.replace("_", " ").title()
+                    img = Image.open(img_file).convert("RGBA")
 
-        # BEARD VARIATIONS
+                    # remove white background
+                    datas = img.getdata()
+                    new_data = []
+                    for r, g, b, a in datas:
+                        # turn nearly-white pixels into transparent
+                        if r + g + b > 650:
+                            new_data.append((255, 255, 255, 0))  # transparent
+                        else:
+                            new_data.append((r, g, b, a))
+                    img.putdata(new_data)
+
+                    self.feature_catalog[category][name] = img
+                    print(f"✓ Loaded: {name} from {img_file.name}")
+                except Exception as e:
+                    print(f"✗ Failed to load {img_file.name}: {e}")
+
+    def init_feature_catalog(self):
+        """Initialize catalog - loads both synthetic and real images"""
+
+        # EYES - Real Images (your images)
+        self.feature_catalog['eyes'] = {}
+
+        # Try to load real eye images from assets folder
+        eyes_folder = WORKDIR / "assets" / "eye_images"
+        if eyes_folder.exists():
+            for img_file in eyes_folder.glob("*.png"):
+                try:
+                    img = Image.open(img_file).convert("RGBA")
+                    # Use filename without extension as the label
+                    name = img_file.stem.replace("_", " ").title()
+                    self.feature_catalog['eyes'][name] = img
+                    print(f"✓ Loaded: {name} from {img_file.name}")
+                except Exception as e:
+                    print(f"✗ Failed to load {img_file.name}: {e}")
+
+        mustahce_folder = WORKDIR / "assets" / "mustache_images"
+        self.add_to_catalog('mustache', mustahce_folder)
+
+        eyeglasses_folder = WORKDIR / "assets" / "eyeglasses"
+        self.add_to_catalog('eyeglasses', eyeglasses_folder)
+
+        left_eyebrow_folder = WORKDIR / "assets" / "left_eyebrow"
+        self.add_to_catalog('left_eyebrow', left_eyebrow_folder)
+
+        right_eyebrow_folder = WORKDIR / "assets" / "right_eyebrow"
+        self.add_to_catalog('right_eyebrow', right_eyebrow_folder)
+
+        lips_folder = WORKDIR / "assets" / "lips"
+        self.add_to_catalog('lips', lips_folder)
+
+        nose_folder = WORKDIR / "assets" / "nose_images"
+        self.add_to_catalog('nose', nose_folder)
+
+        # If no images found, create a placeholder
+        if not self.feature_catalog['eyes']:
+            print("⚠ No eye images found in assets/eye_images/")
+            placeholder = Image.new('RGBA', (200, 100), (200, 200, 200, 255))
+            draw = ImageDraw.Draw(placeholder)
+            draw.text((100, 50), "No images\nfound", fill=(100, 100, 100, 255), anchor="mm")
+            self.feature_catalog['eyes']['Placeholder'] = placeholder
+
+        # BEARD VARIATIONS (synthetic for testing)
         self.feature_catalog['beard'] = {}
 
-        # Full Beard
         beard1 = Image.new('RGBA', (180, 140), (0, 0, 0, 0))
         draw = ImageDraw.Draw(beard1)
         draw.ellipse([30, 20, 150, 120], fill=(45, 28, 18, 220))
         draw.ellipse([40, 10, 140, 100], fill=(55, 35, 22, 200))
         self.feature_catalog['beard']['Full Beard'] = beard1
 
-        # Goatee
         beard2 = Image.new('RGBA', (120, 100), (0, 0, 0, 0))
         draw = ImageDraw.Draw(beard2)
         draw.ellipse([30, 30, 90, 90], fill=(45, 28, 18, 220))
         draw.rectangle([45, 10, 75, 50], fill=(45, 28, 18, 220))
         self.feature_catalog['beard']['Goatee'] = beard2
-
-        # Short Stubble
-        beard3 = Image.new('RGBA', (160, 120), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(beard3)
-        draw.ellipse([30, 20, 130, 100], fill=(60, 40, 30, 150))
-        self.feature_catalog['beard']['Stubble'] = beard3
-
-        # Van Dyke
-        beard4 = Image.new('RGBA', (140, 110), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(beard4)
-        draw.ellipse([40, 50, 100, 105], fill=(45, 28, 18, 220))
-        draw.rectangle([60, 10, 80, 60], fill=(45, 28, 18, 220))
-        self.feature_catalog['beard']['Van Dyke'] = beard4
-
-        # Chin Strap
-        beard5 = Image.new('RGBA', (180, 100), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(beard5)
-        draw.arc([20, 20, 80, 90], 180, 360, fill=(45, 28, 18, 255), width=15)
-        draw.arc([100, 20, 160, 90], 180, 360, fill=(45, 28, 18, 255), width=15)
-        draw.line([40, 90, 140, 90], fill=(45, 28, 18, 255), width=15)
-        self.feature_catalog['beard']['Chin Strap'] = beard5
-
-        # MUSTACHE VARIATIONS
-        self.feature_catalog['mustache'] = {}
-
-        # Handlebar Mustache
-        mustache1 = Image.new('RGBA', (180, 60), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(mustache1)
-        draw.arc([10, 15, 70, 55], 200, 340, fill=(45, 28, 18, 255), width=12)
-        draw.arc([110, 15, 170, 55], 200, 340, fill=(45, 28, 18, 255), width=12)
-        draw.rectangle([65, 30, 115, 42], fill=(45, 28, 18, 255))
-        self.feature_catalog['mustache']['Handlebar'] = mustache1
-
-        # Pencil Mustache
-        mustache2 = Image.new('RGBA', (120, 30), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(mustache2)
-        draw.rectangle([20, 12, 100, 18], fill=(45, 28, 18, 255))
-        self.feature_catalog['mustache']['Pencil'] = mustache2
-
-        # Walrus Mustache
-        mustache3 = Image.new('RGBA', (160, 80), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(mustache3)
-        draw.ellipse([20, 10, 70, 70], fill=(45, 28, 18, 220))
-        draw.ellipse([90, 10, 140, 70], fill=(45, 28, 18, 220))
-        draw.rectangle([60, 30, 100, 50], fill=(45, 28, 18, 220))
-        self.feature_catalog['mustache']['Walrus'] = mustache3
-
-        # Chevron Mustache
-        mustache4 = Image.new('RGBA', (140, 50), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(mustache4)
-        draw.rectangle([20, 15, 120, 35], fill=(45, 28, 18, 240))
-        self.feature_catalog['mustache']['Chevron'] = mustache4
-
-        # SUNGLASSES VARIATIONS
-        self.feature_catalog['sunglasses'] = {}
-
-        # Aviator
-        sunglasses1 = Image.new('RGBA', (200, 80), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(sunglasses1)
-        draw.ellipse([20, 15, 85, 65], fill=(20, 20, 20, 180), outline=(50, 50, 50, 255), width=2)
-        draw.ellipse([115, 15, 180, 65], fill=(20, 20, 20, 180), outline=(50, 50, 50, 255), width=2)
-        draw.rectangle([83, 38, 117, 42], fill=(50, 50, 50, 255))
-        self.feature_catalog['sunglasses']['Aviator'] = sunglasses1
-
-        # Wayfarer
-        sunglasses2 = Image.new('RGBA', (200, 70), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(sunglasses2)
-        draw.rectangle([20, 15, 85, 55], fill=(20, 20, 20, 200), outline=(10, 10, 10, 255), width=3)
-        draw.rectangle([115, 15, 180, 55], fill=(20, 20, 20, 200), outline=(10, 10, 10, 255), width=3)
-        draw.rectangle([83, 33, 117, 37], fill=(10, 10, 10, 255))
-        self.feature_catalog['sunglasses']['Wayfarer'] = sunglasses2
-
-        # Round Glasses
-        sunglasses3 = Image.new('RGBA', (200, 80), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(sunglasses3)
-        draw.ellipse([25, 20, 80, 60], fill=(100, 100, 150, 120), outline=(40, 40, 40, 255), width=3)
-        draw.ellipse([120, 20, 175, 60], fill=(100, 100, 150, 120), outline=(40, 40, 40, 255), width=3)
-        draw.rectangle([78, 38, 122, 42], fill=(40, 40, 40, 255))
-        self.feature_catalog['sunglasses']['Round'] = sunglasses3
-
-        # Cat Eye
-        sunglasses4 = Image.new('RGBA', (220, 75), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(sunglasses4)
-        pts1 = [(15, 40), (30, 25), (75, 25), (90, 40), (75, 50), (30, 50)]
-        draw.polygon(pts1, fill=(20, 20, 20, 200), outline=(10, 10, 10, 255))
-        pts2 = [(130, 40), (145, 25), (190, 25), (205, 40), (190, 50), (145, 50)]
-        draw.polygon(pts2, fill=(20, 20, 20, 200), outline=(10, 10, 10, 255))
-        draw.rectangle([88, 38, 132, 42], fill=(10, 10, 10, 255))
-        self.feature_catalog['sunglasses']['Cat Eye'] = sunglasses4
-
-        # HAT VARIATIONS
-        self.feature_catalog['hat'] = {}
-
-        # Top Hat
-        hat1 = Image.new('RGBA', (160, 180), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(hat1)
-        draw.rectangle([40, 20, 120, 120], fill=(30, 30, 35, 255))
-        draw.ellipse([20, 110, 140, 145], fill=(35, 35, 40, 255))
-        draw.rectangle([35, 116, 125, 125], fill=(80, 20, 20, 255))
-        self.feature_catalog['hat']['Top Hat'] = hat1
-
-        # Baseball Cap
-        hat2 = Image.new('RGBA', (180, 100), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(hat2)
-        draw.ellipse([30, 30, 150, 85], fill=(200, 50, 50, 255))
-        draw.ellipse([20, 55, 90, 95], fill=(180, 40, 40, 255))
-        self.feature_catalog['hat']['Baseball Cap'] = hat2
-
-        # Cowboy Hat
-        hat3 = Image.new('RGBA', (200, 120), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(hat3)
-        draw.ellipse([20, 70, 180, 110], fill=(139, 90, 43, 255))
-        pts = [(100, 25), (60, 70), (140, 70)]
-        draw.polygon(pts, fill=(160, 100, 50, 255))
-        draw.ellipse([70, 60, 130, 85], fill=(139, 90, 43, 255))
-        self.feature_catalog['hat']['Cowboy'] = hat3
-
-        # Beanie
-        hat4 = Image.new('RGBA', (140, 90), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(hat4)
-        draw.ellipse([20, 30, 120, 80], fill=(100, 100, 120, 255))
-        draw.ellipse([50, 15, 90, 45], fill=(100, 100, 120, 255))
-        self.feature_catalog['hat']['Beanie'] = hat4
-
-        # HAIR VARIATIONS
-        self.feature_catalog['hair'] = {}
-
-        # Afro
-        hair1 = Image.new('RGBA', (200, 180), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(hair1)
-        draw.ellipse([20, 20, 180, 160], fill=(45, 28, 18, 255))
-        self.feature_catalog['hair']['Afro'] = hair1
-
-        # Long Hair
-        hair2 = Image.new('RGBA', (220, 200), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(hair2)
-        draw.ellipse([30, 10, 100, 80], fill=(60, 40, 20, 255))
-        draw.ellipse([120, 10, 190, 80], fill=(60, 40, 20, 255))
-        draw.rectangle([30, 50, 190, 180], fill=(60, 40, 20, 255))
-        self.feature_catalog['hair']['Long Hair'] = hair2
-
-        # Mohawk
-        hair3 = Image.new('RGBA', (80, 150), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(hair3)
-        draw.rectangle([25, 20, 55, 140], fill=(200, 50, 50, 255))
-        draw.polygon([(25, 20), (40, 5), (55, 20)], fill=(200, 50, 50, 255))
-        self.feature_catalog['hair']['Mohawk'] = hair3
-
-        # Bob Cut
-        hair4 = Image.new('RGBA', (180, 140), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(hair4)
-        draw.ellipse([20, 10, 160, 90], fill=(139, 69, 19, 255))
-        draw.rectangle([20, 50, 160, 120], fill=(139, 69, 19, 255))
-        self.feature_catalog['hair']['Bob Cut'] = hair4
-
-        # EYEWEAR VARIATIONS
-        self.feature_catalog['glasses'] = {}
-
-        # Nerd Glasses
-        glasses1 = Image.new('RGBA', (200, 80), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(glasses1)
-        draw.rectangle([20, 25, 80, 60], fill=(255, 255, 255, 100), outline=(20, 20, 20, 255), width=4)
-        draw.rectangle([120, 25, 180, 60], fill=(255, 255, 255, 100), outline=(20, 20, 20, 255), width=4)
-        draw.rectangle([78, 40, 122, 45], fill=(20, 20, 20, 255))
-        self.feature_catalog['glasses']['Nerd Glasses'] = glasses1
-
-        # Reading Glasses
-        glasses2 = Image.new('RGBA', (180, 70), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(glasses2)
-        draw.ellipse([20, 20, 75, 60], fill=(255, 255, 255, 80), outline=(100, 80, 60, 255), width=2)
-        draw.ellipse([105, 20, 160, 60], fill=(255, 255, 255, 80), outline=(100, 80, 60, 255), width=2)
-        draw.rectangle([73, 38, 107, 42], fill=(100, 80, 60, 255))
-        self.feature_catalog['glasses']['Reading'] = glasses2
-
-        # Monocle
-        glasses3 = Image.new('RGBA', (100, 100), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(glasses3)
-        draw.ellipse([20, 20, 80, 80], fill=(255, 255, 255, 100), outline=(180, 150, 100, 255), width=3)
-        draw.rectangle([75, 48, 90, 52], fill=(180, 150, 100, 255))
-        self.feature_catalog['glasses']['Monocle'] = glasses3
-
-        self.feature_catalog['eyes'] = {}
-        self.feature_catalog['eyes']['Blue Eyes'] = Image.open(os.path.join(WORKDIR, 'assets', 'eye_images', 'blue_eye1.png')).convert('RGBA').resize((80, 50), Image.Resampling.LANCZOS)
 
     def create_catalog_gallery(self, category):
         """Create a gallery of thumbnails for the selected category"""
@@ -262,33 +145,29 @@ class CatalogEditor:
 
         return gallery_items
 
-    def select_from_catalog(self, evt: gr.SelectData, category):
-        """Handle selection from the catalog gallery"""
-        selected_name = evt.value['caption']
-        self.selected_feature = (category, selected_name)
-        return f"✓ Selected: {selected_name} from {category}"
-
-    def handle_image_click(self, img, evt: gr.SelectData):
-        """Place or move the selected feature where the user clicked"""
-        if img is None:
-            return None, "❌ Please upload an image first"
-
-        # Set base image if this is first interaction
-        if self.base_image is None:
-            self.base_image = Image.fromarray(img).convert('RGBA')
-            return self.base_image, "✓ Image loaded! Select a feature from the catalog."
-
+    def get_feature_preview(self):
+        """Generate a preview of the currently selected feature with current settings"""
         if self.selected_feature is None:
-            return self.composite_image(), "❌ Please select a feature from the catalog first"
+            # Return a placeholder
+            placeholder = Image.new('RGBA', (300, 300), (240, 240, 240, 255))
+            draw = ImageDraw.Draw(placeholder)
+            try:
+                font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 16)
+            except:
+                font = ImageFont.load_default()
+            text = "Select a feature\nfrom catalog"
+            draw.text((150, 150), text, fill=(150, 150, 150, 255), font=font, anchor="mm")
+            return placeholder
 
         category, feature_name = self.selected_feature
+
+        # Get the original image from catalog
+        if category not in self.feature_catalog or feature_name not in self.feature_catalog[category]:
+            return self.get_feature_preview()  # Return placeholder if not found
+
         feature_img = self.feature_catalog[category][feature_name].copy()
 
-        # Get click coordinates - evt.index contains (x, y) pixel coordinates
-        click_x = evt.index[0]
-        click_y = evt.index[1]
-
-        # Apply transformations
+        # Apply current transformations
         if self.current_scale != 1.0:
             new_size = (int(feature_img.width * self.current_scale),
                         int(feature_img.height * self.current_scale))
@@ -300,16 +179,138 @@ class CatalogEditor:
 
         if self.current_opacity != 1.0:
             feature_array = np.array(feature_img)
-            feature_array[:, :, 3] = (feature_array[:, :, 3] * self.current_opacity).astype(np.uint8)
-            feature_img = Image.fromarray(feature_array)
+            if feature_array.shape[2] == 4:  # Has alpha channel
+                feature_array[:, :, 3] = (feature_array[:, :, 3] * self.current_opacity).astype(np.uint8)
+                feature_img = Image.fromarray(feature_array)
+
+        # Create a canvas that fits the feature with padding
+        # Make canvas size adaptive to always show the entire feature
+        canvas_size = 400  # Larger base canvas
+        padding = 20
+
+        # If feature is larger than canvas, scale it down to fit
+        max_feature_size = canvas_size - (2 * padding)
+        if feature_img.width > max_feature_size or feature_img.height > max_feature_size:
+            # Scale down to fit while maintaining aspect ratio
+            feature_img.thumbnail((max_feature_size, max_feature_size), Image.Resampling.LANCZOS)
+
+        # Create white background canvas
+        canvas = Image.new('RGBA', (canvas_size, canvas_size), (255, 255, 255, 255))
+
+        # Center the feature on the canvas
+        x = (canvas_size - feature_img.width) // 2
+        y = (canvas_size - feature_img.height) // 2
+        canvas.paste(feature_img, (x, y), feature_img)
+
+        # Add a reference grid to show scale
+        draw = ImageDraw.Draw(canvas)
+
+        # Draw a light border around the feature to show its bounds
+        border_rect = [x - 1, y - 1, x + feature_img.width, y + feature_img.height]
+        draw.rectangle(border_rect, outline=(200, 200, 200, 255), width=1)
+
+        # Add size info at the bottom
+        try:
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 12)
+        except:
+            font = ImageFont.load_default()
+
+        size_text = f"Size: {self.current_scale:.1f}x ({feature_img.width}×{feature_img.height}px)"
+        text_bbox = draw.textbbox((0, 0), size_text, font=font)
+        text_width = text_bbox[2] - text_bbox[0]
+        draw.text(((canvas_size - text_width) // 2, canvas_size - 25),
+                  size_text, fill=(100, 100, 100, 255), font=font)
+
+        return canvas
+
+    def get_current_display_image(self):
+        """Get the current image that should be displayed (with overlays if any)"""
+        if self.base_image is None:
+            return None
+        # Return as numpy array since image_display expects numpy
+        return np.array(self.composite_image())
+
+    def change_category(self, category):
+        """Handle category change - only update gallery, not the image"""
+        gallery = self.create_catalog_gallery(category)
+        # Return gr.update() to skip updating the image (no reload needed)
+        return gr.update(), gallery
+
+    def select_from_catalog(self, evt: gr.SelectData, category):
+        """Handle selection from the catalog gallery with auto-confirm"""
+        selected_name = evt.value['caption']
+
+        # AUTO-CONFIRM: If there's a preview overlay active, confirm it first
+        status_msg = ""
+        image_update = gr.update()  # By default, don't update the image
+
+        if self.preview_overlay is not None:
+            # Automatically confirm the current preview
+            self.overlays.append(self.preview_overlay)
+            old_feature_name = self.preview_overlay['name']
+            self.preview_overlay = None
+            status_msg = f"✅ Auto-confirmed {old_feature_name}!\n"
+            # Update the image to show the confirmed placement
+            image_update = self.get_current_display_image()
+
+        # Now select the new feature
+        self.selected_feature = (category, selected_name)
+
+        # Reset sliders to default when selecting new feature
+        self.current_scale = 0.2
+        self.current_rotation = 0
+        self.current_opacity = 1.0
+
+        preview_img = self.get_feature_preview()
+        status_msg += f"✓ Selected: {selected_name} from {category}\n💡 Adjust size/rotation/opacity below and watch the preview update!"
+
+        return (
+            image_update,  # Only update if we auto-confirmed, otherwise skip
+            status_msg,
+            preview_img,
+            0.2,  # Reset scale slider
+            0,  # Reset rotation slider
+            1.0  # Reset opacity slider
+        )
+
+    def handle_image_upload(self, img):
+        """Handle image upload separately from clicks"""
+        if img is None:
+            return None, "❌ No image provided"
+
+        # store as PIL and return numpy (image_display is set to type="numpy")
+        self.base_image = Image.fromarray(img).convert('RGBA')
+        self.overlays = []
+        self.preview_overlay = None
+        return np.array(
+            self.base_image), "✓ Image loaded! Now select a feature from the catalog and click on the image to place it."
+
+    def handle_image_click(self, img, evt: gr.SelectData):
+        """Place or move the selected feature where the user clicked"""
+        if img is None:
+            return None, "❌ Please upload an image first"
+
+        # Ensure base image is set
+        if self.base_image is None:
+            self.base_image = Image.fromarray(img).convert('RGBA')
+
+        if self.selected_feature is None:
+            return np.array(self.composite_image()), "❌ Please select a feature from the catalog first"
+
+        category, feature_name = self.selected_feature
+        feature_img = self.feature_catalog[category][feature_name].copy()
+
+        # Get click coordinates - evt.index contains (x, y) pixel coordinates
+        click_x = evt.index[0]
+        click_y = evt.index[1]
 
         # If we have a preview overlay, we're moving it
         if self.preview_overlay is not None:
-            # Update the preview position
             self.preview_overlay['x'] = click_x
             self.preview_overlay['y'] = click_y
             result = self.composite_image()
-            return result, f"🔄 Moved {feature_name} to ({click_x}, {click_y}). Click 'Confirm' or click again to adjust."
+            return np.array(
+                result), f"🔄 Moved {feature_name} to ({click_x}, {click_y}). Click 'Confirm' or click again to adjust."
         else:
             # Create new preview overlay
             overlay_info = {
@@ -323,27 +324,28 @@ class CatalogEditor:
             }
             self.preview_overlay = overlay_info
             result = self.composite_image()
-            return result, f"✓ Preview: {feature_name} at ({click_x}, {click_y}). Click 'Confirm' to keep it, or click again to move it."
+            return np.array(
+                result), f"✓ Preview: {feature_name} at ({click_x}, {click_y}). Click 'Confirm' to keep it, or click again to move it."
 
     def confirm_placement(self):
         """Confirm the current preview and add it to overlays"""
         if self.preview_overlay is None:
-            return self.composite_image(), "❌ No feature to confirm"
+            return np.array(self.composite_image()) if self.base_image else None, "❌ No feature to confirm"
 
         self.overlays.append(self.preview_overlay)
         feature_name = self.preview_overlay['name']
         self.preview_overlay = None
         result = self.composite_image()
-        return result, f"✅ Confirmed {feature_name}! Select another feature or adjust this one."
+        return np.array(result), f"✅ Confirmed {feature_name}! Select another feature or adjust this one."
 
     def cancel_preview(self):
         """Cancel the current preview"""
         if self.preview_overlay is None:
-            return self.composite_image(), "❌ No preview to cancel"
+            return np.array(self.composite_image()) if self.base_image else None, "❌ No preview to cancel"
 
         self.preview_overlay = None
         result = self.composite_image()
-        return result, "↩️ Preview cancelled"
+        return np.array(result), "↩️ Preview cancelled"
 
     def composite_image(self):
         """Composite all overlays onto the base image, including preview"""
@@ -366,6 +368,10 @@ class CatalogEditor:
         """Apply a single overlay to an image"""
         category = overlay['category']
         name = overlay['name']
+
+        if category not in self.feature_catalog or name not in self.feature_catalog[category]:
+            return base_img
+
         feature_img = self.feature_catalog[category][name].copy()
 
         # Apply transformations
@@ -380,8 +386,9 @@ class CatalogEditor:
 
         if overlay['opacity'] != 1.0:
             feature_array = np.array(feature_img)
-            feature_array[:, :, 3] = (feature_array[:, :, 3] * overlay['opacity']).astype(np.uint8)
-            feature_img = Image.fromarray(feature_array)
+            if feature_array.shape[2] == 4:  # Has alpha channel
+                feature_array[:, :, 3] = (feature_array[:, :, 3] * overlay['opacity']).astype(np.uint8)
+                feature_img = Image.fromarray(feature_array)
 
         # Calculate position (center the feature at the clicked point)
         x = overlay['x'] - feature_img.width // 2
@@ -395,38 +402,66 @@ class CatalogEditor:
     def undo_last(self):
         """Remove the last added overlay or cancel preview"""
         if self.preview_overlay is not None:
-            # If there's a preview, cancel it first
             self.preview_overlay = None
             result = self.composite_image()
-            return result, "↩️ Cancelled preview"
+            return np.array(result), "↩️ Cancelled preview"
 
         if not self.overlays:
-            return self.composite_image(), "❌ Nothing to undo"
+            return np.array(self.composite_image()) if self.base_image else None, "❌ Nothing to undo"
 
         self.overlays.pop()
         result = self.composite_image()
-        return result, "✓ Undid last action"
+        return np.array(result), "✓ Undid last action"
 
     def clear_all(self):
         """Remove all overlays and preview"""
         self.overlays = []
         self.preview_overlay = None
-        return self.base_image if self.base_image else None, "✓ Cleared all features"
+        if self.base_image:
+            return np.array(self.base_image), "✓ Cleared all features"
+        return None, "✓ Cleared all features"
 
     def update_scale(self, scale):
-        """Update the current scale setting"""
+        """Update the current scale setting and preview if active"""
         self.current_scale = scale
-        return f"Scale: {scale:.2f}x"
+
+        # FIXED: Update preview overlay BEFORE getting the display image
+        if self.preview_overlay is not None:
+            self.preview_overlay['scale'] = scale
+
+        # Now get the images with updated values
+        preview_img = self.get_feature_preview()
+        current_img = self.get_current_display_image()
+
+        return current_img, f"Scale: {scale:.2f}x", preview_img
 
     def update_rotation(self, rotation):
-        """Update the current rotation setting"""
+        """Update the current rotation setting and preview if active"""
         self.current_rotation = rotation
-        return f"Rotation: {rotation}°"
+
+        # FIXED: Update preview overlay BEFORE getting the display image
+        if self.preview_overlay is not None:
+            self.preview_overlay['rotation'] = rotation
+
+        # Now get the images with updated values
+        preview_img = self.get_feature_preview()
+        current_img = self.get_current_display_image()
+
+        return current_img, f"Rotation: {rotation}°", preview_img
 
     def update_opacity(self, opacity):
-        """Update the current opacity setting"""
+        """Update the current opacity setting and preview if active"""
         self.current_opacity = opacity
-        return f"Opacity: {int(opacity * 100)}%"
+
+        # FIXED: Update preview overlay BEFORE getting the display image
+        if self.preview_overlay is not None:
+            self.preview_overlay['opacity'] = opacity
+
+        # Now get the images with updated values
+        preview_img = self.get_feature_preview()
+        current_img = self.get_current_display_image()
+
+        return current_img, f"Opacity: {int(opacity * 100)}%", preview_img
 
     def get_overlay_list(self):
         """Get a formatted list of current overlays"""
@@ -450,8 +485,9 @@ def create_interface():
     editor = CatalogEditor()
 
     with gr.Blocks(title="Feature Catalog Editor", theme=gr.themes.Soft()) as interface:
-        gr.Markdown("# 🎨 Feature Catalog Editor")
+        gr.Markdown("# 🎨 Feature Catalog Editor - Real Image Support")
         gr.Markdown("Upload an image, select features from the catalog, and click on the image to place them!")
+        gr.Markdown("💡 **NEW:** Real-time preview shows your exact size adjustments before placing!")
 
         with gr.Row():
             # Left column - Single Interactive Image
@@ -472,7 +508,7 @@ def create_interface():
                 status_text = gr.Textbox(
                     label="Status",
                     interactive=False,
-                    lines=2,
+                    lines=3,
                     value="Upload an image to get started!"
                 )
 
@@ -486,8 +522,9 @@ def create_interface():
             with gr.Column(scale=1):
                 gr.Markdown("### 1. Select Category")
                 category_select = gr.Radio(
-                    choices=["beard", "mustache", "sunglasses", "glasses", "hat", "hair", 'eyes'],
-                    value="beard",
+                    choices=["eyes", "beard", "mustache", "eyeglasses", "left_eyebrow", 'right_eyebrow', 'lips',
+                             'nose'],  # Add more as needed
+                    value="eyes",
                     label="Feature Category"
                 )
 
@@ -501,13 +538,22 @@ def create_interface():
                     object_fit="contain"
                 )
 
-                gr.Markdown("### 3. Adjust Settings (Optional)")
+                gr.Markdown("### 3. 👁️ LIVE PREVIEW - Adjust & Watch!")
+                gr.Markdown("**The ENTIRE image is always visible - just scaled to different sizes!**")
+
+                feature_preview = gr.Image(
+                    label="🔍 Full Feature Preview (entire image visible at all scales)",
+                    type="pil",
+                    interactive=False,
+                    height=400
+                )
+
                 scale_slider = gr.Slider(
-                    minimum=0.3,
-                    maximum=3.0,
-                    value=1.0,
-                    step=0.1,
-                    label="Size"
+                    minimum=0.02,
+                    maximum=0.5,
+                    value=0.1,
+                    step=0.01,
+                    label="📏 Size (0.01x - 0.5x) - DRAG TO SEE CHANGES!"
                 )
 
                 rotation_slider = gr.Slider(
@@ -515,7 +561,7 @@ def create_interface():
                     maximum=180,
                     value=0,
                     step=5,
-                    label="Rotation (degrees)"
+                    label="🔄 Rotation (degrees)"
                 )
 
                 opacity_slider = gr.Slider(
@@ -523,19 +569,26 @@ def create_interface():
                     maximum=1.0,
                     value=1.0,
                     step=0.1,
-                    label="Opacity"
+                    label="👻 Opacity (transparency)"
                 )
 
-                gr.Markdown("### 4. Click on Image")
-                gr.Markdown("Click where you want to place the feature. Click again to move it before confirming.")
+                gr.Markdown("### 4. Click on Image to Place")
+                gr.Markdown("💡 **Tip:** Adjust size first, then click where you want it!")
 
         # Event handlers
 
-        # Update catalog when category changes
+        # Handle image upload (separate from clicks)
+        image_display.upload(
+            fn=editor.handle_image_upload,
+            inputs=[image_display],
+            outputs=[image_display, status_text]
+        )
+
+        # Update catalog when category changes - now ONLY updates gallery
         category_select.change(
-            fn=editor.create_catalog_gallery,
+            fn=editor.change_category,
             inputs=[category_select],
-            outputs=[catalog_gallery]
+            outputs=[image_display, catalog_gallery]
         )
 
         # Initialize catalog with default category
@@ -545,11 +598,11 @@ def create_interface():
             outputs=[catalog_gallery]
         )
 
-        # Select from catalog
+        # Select from catalog - now with auto-confirm and optimized image updates
         catalog_gallery.select(
             fn=editor.select_from_catalog,
             inputs=[category_select],
-            outputs=[status_text]
+            outputs=[image_display, status_text, feature_preview, scale_slider, rotation_slider, opacity_slider]
         )
 
         # Click on image to place/move feature
@@ -582,23 +635,23 @@ def create_interface():
             outputs=[image_display, status_text]
         )
 
-        # Update settings
+        # Update settings - THESE UPDATE THE PREVIEW IN REAL-TIME!
         scale_slider.change(
             fn=editor.update_scale,
             inputs=[scale_slider],
-            outputs=[]
+            outputs=[image_display, status_text, feature_preview]
         )
 
         rotation_slider.change(
             fn=editor.update_rotation,
             inputs=[rotation_slider],
-            outputs=[]
+            outputs=[image_display, status_text, feature_preview]
         )
 
         opacity_slider.change(
             fn=editor.update_opacity,
             inputs=[opacity_slider],
-            outputs=[]
+            outputs=[image_display, status_text, feature_preview]
         )
 
         # Update overlay list when image changes
