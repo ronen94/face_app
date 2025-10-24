@@ -5,6 +5,7 @@ import os
 from typing import List, Dict, Optional, Tuple
 import json
 from pathlib import Path
+from datetime import datetime
 
 WORKDIR = Path(__file__).parent
 
@@ -422,17 +423,15 @@ class CatalogEditor:
         return None, "✓ Cleared all features"
 
     def update_scale(self, scale):
-        """Update the current scale setting and preview if active"""
         self.current_scale = scale
 
-        # FIXED: Update preview overlay BEFORE getting the display image
         if self.preview_overlay is not None:
             self.preview_overlay['scale'] = scale
+            current_img = self.get_current_display_image()  # Update when preview exists
+        else:
+            current_img = gr.update()  # Skip update when just browsing catalog
 
-        # Now get the images with updated values
         preview_img = self.get_feature_preview()
-        current_img = self.get_current_display_image()
-
         return current_img, f"Scale: {scale:.2f}x", preview_img
 
     def update_rotation(self, rotation):
@@ -480,6 +479,59 @@ class CatalogEditor:
 
         return overlay_text
 
+    def save_image(self, save_path):
+        """Save the final composite image to the specified path"""
+        if self.base_image is None:
+            return "❌ No image to save! Please upload an image first."
+
+        # Check if there's a preview that needs to be confirmed
+        if self.preview_overlay is not None:
+            return "⚠️ You have an unconfirmed preview! Please click 'Confirm' or 'Cancel' before saving."
+
+        # Validate and process the save path
+        if not save_path or save_path.strip() == "":
+            # Generate a default filename with timestamp
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            save_path = f"edited_image_{timestamp}.png"
+
+        try:
+            # Convert to Path object and resolve it
+            save_path = Path(save_path).expanduser()
+
+            # If it's a relative path, make it relative to WORKDIR
+            if not save_path.is_absolute():
+                save_path = WORKDIR / save_path
+
+            # Create parent directories if they don't exist
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+
+            # Get the composite image
+            final_image = self.composite_image()
+
+            # Determine format based on file extension
+            file_ext = save_path.suffix.lower()
+
+            if file_ext in ['.jpg', '.jpeg']:
+                # Convert RGBA to RGB for JPEG (no transparency support)
+                rgb_image = Image.new('RGB', final_image.size, (255, 255, 255))
+                rgb_image.paste(final_image, mask=final_image.split()[3] if final_image.mode == 'RGBA' else None)
+                rgb_image.save(save_path, 'JPEG', quality=95)
+            elif file_ext == '.png' or file_ext == '':
+                # Save as PNG (supports transparency)
+                if file_ext == '':
+                    save_path = save_path.with_suffix('.png')
+                final_image.save(save_path, 'PNG')
+            else:
+                # Try to save with the specified format
+                final_image.save(save_path)
+
+            return f"✅ Image saved successfully to:\n{save_path.absolute()}"
+
+        except PermissionError:
+            return f"❌ Permission denied! Cannot write to:\n{save_path}\nPlease choose a different location or check your permissions."
+        except Exception as e:
+            return f"❌ Error saving image:\n{str(e)}\n\nPlease check the path and try again."
+
 
 def create_interface():
     editor = CatalogEditor()
@@ -505,6 +557,28 @@ def create_interface():
                     undo_btn = gr.Button("↶ Undo Last", variant="secondary", size="sm")
                     clear_btn = gr.Button("🗑️ Clear All", variant="stop", size="sm")
 
+                # Save section
+                gr.Markdown("---")
+                gr.Markdown("### 💾 Save Your Work")
+
+                with gr.Row():
+                    save_path_input = gr.Textbox(
+                        label="Save Path",
+                        placeholder="output/my_image.png (leave empty for auto-generated name)",
+                        value="",
+                        scale=3
+                    )
+                    save_btn = gr.Button("💾 Save Image", variant="primary", size="lg", scale=1)
+
+                save_status = gr.Textbox(
+                    label="Save Status",
+                    interactive=False,
+                    lines=2,
+                    value="Enter a path and click 'Save Image' to save your work"
+                )
+
+                gr.Markdown("---")
+
                 status_text = gr.Textbox(
                     label="Status",
                     interactive=False,
@@ -522,7 +596,7 @@ def create_interface():
             with gr.Column(scale=1):
                 gr.Markdown("### 1. Select Category")
                 category_select = gr.Radio(
-                    choices=["eyes", "beard", "mustache", "eyeglasses", "left_eyebrow", 'right_eyebrow', 'lips',
+                    choices=["eyes", "mustache", "eyeglasses", "left_eyebrow", 'right_eyebrow', 'lips',
                              'nose'],  # Add more as needed
                     value="eyes",
                     label="Feature Category"
@@ -633,6 +707,13 @@ def create_interface():
         clear_btn.click(
             fn=editor.clear_all,
             outputs=[image_display, status_text]
+        )
+
+        # Save button
+        save_btn.click(
+            fn=editor.save_image,
+            inputs=[save_path_input],
+            outputs=[save_status]
         )
 
         # Update settings - THESE UPDATE THE PREVIEW IN REAL-TIME!
