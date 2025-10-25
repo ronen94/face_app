@@ -85,6 +85,12 @@ class CatalogEditor:
         nose_folder = WORKDIR / "assets" / "nose_images"
         self.add_to_catalog('nose', nose_folder)
 
+        left_dimple_folder = WORKDIR / "assets" / "left_dimples"
+        self.add_to_catalog('left_dimples', left_dimple_folder)
+
+        right_dimple_folder = WORKDIR / "assets" / "right_dimples"
+        self.add_to_catalog('right_dimples', right_dimple_folder)
+
         # If no images found, create a placeholder
         if not self.feature_catalog['eyes']:
             print("⚠ No eye images found in assets/eye_images/")
@@ -232,10 +238,28 @@ class CatalogEditor:
         return np.array(self.composite_image())
 
     def change_category(self, category):
-        """Handle category change - only update gallery, not the image"""
+        """Handle category change - update gallery and auto-select first item"""
         gallery = self.create_catalog_gallery(category)
-        # Return gr.update() to skip updating the image (no reload needed)
-        return gr.update(), gallery
+
+        # Auto-select the first item from the new category
+        if category in self.feature_catalog and self.feature_catalog[category]:
+            first_item_name = list(self.feature_catalog[category].keys())[0]
+            self.selected_feature = (category, first_item_name)
+
+            # Reset sliders to default
+            self.current_scale = 0.2
+            self.current_rotation = 0
+            self.current_opacity = 1.0
+
+            # Get the preview for the first item
+            preview_img = self.get_feature_preview()
+        else:
+            # No items in this category
+            self.selected_feature = None
+            preview_img = self.get_feature_preview()  # Will show placeholder
+
+        # Return: image_display, gallery, preview, scale, rotation, opacity
+        return gr.update(), gallery, preview_img, 0.2, 0, 1.0
 
     def select_from_catalog(self, evt: gr.SelectData, category):
         """Handle selection from the catalog gallery with auto-confirm"""
@@ -597,7 +621,7 @@ def create_interface():
                 gr.Markdown("### 1. Select Category")
                 category_select = gr.Radio(
                     choices=["eyes", "mustache", "eyeglasses", "left_eyebrow", 'right_eyebrow', 'lips',
-                             'nose'],  # Add more as needed
+                             'nose', 'left_dimples', 'right_dimples'],  # Add more as needed
                     value="eyes",
                     label="Feature Category"
                 )
@@ -658,11 +682,11 @@ def create_interface():
             outputs=[image_display, status_text]
         )
 
-        # Update catalog when category changes - now ONLY updates gallery
+        # Update catalog when category changes - updates gallery and auto-selects first item
         category_select.change(
             fn=editor.change_category,
             inputs=[category_select],
-            outputs=[image_display, catalog_gallery]
+            outputs=[image_display, catalog_gallery, feature_preview, scale_slider, rotation_slider, opacity_slider]
         )
 
         # Initialize catalog with default category

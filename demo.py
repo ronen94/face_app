@@ -22,6 +22,6 @@ def flip_images(input_dir, output_dir):
             print(f"Flipped and saved: {output_path}")
 
 if __name__ == "__main__":
-    input_directory = "C:/Users/ronen/projects/face_app/assets/right_eyebrow"
-    output_directory = "C:/Users/ronen/projects/face_app/assets/left_eyebrow"
+    input_directory = "C:/Users/ronen/projects/face_app/assets/right_dimples"
+    output_directory = "C:/Users/ronen/projects/face_app/assets/left_dimples"
     flip_images(input_directory, output_directory)
