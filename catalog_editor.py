@@ -91,6 +91,15 @@ class CatalogEditor:
         right_dimple_folder = WORKDIR / "assets" / "right_dimples"
         self.add_to_catalog('right_dimples', right_dimple_folder)
 
+        ring_folder = WORKDIR / "assets" / "ring"
+        self.add_to_catalog('ring', ring_folder)
+
+        left_eyelashes = WORKDIR / "assets" / "left_eyelashes"
+        self.add_to_catalog('left_eyelashes', left_eyelashes)
+
+        right_eyelashes = WORKDIR / "assets" / "right_eyelashes"
+        self.add_to_catalog('right_eyelashes', right_eyelashes)
+
         # If no images found, create a placeholder
         if not self.feature_catalog['eyes']:
             print("⚠ No eye images found in assets/eye_images/")
@@ -621,7 +630,7 @@ def create_interface():
                 gr.Markdown("### 1. Select Category")
                 category_select = gr.Radio(
                     choices=["eyes", "mustache", "eyeglasses", "left_eyebrow", 'right_eyebrow', 'lips',
-                             'nose', 'left_dimples', 'right_dimples'],  # Add more as needed
+                             'nose', 'left_dimples', 'right_dimples', 'ring', 'left_eyelashes', 'right_eyelashes'],  # Add more as needed
                     value="eyes",
                     label="Feature Category"
                 )
