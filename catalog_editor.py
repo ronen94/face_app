@@ -100,6 +100,16 @@ class CatalogEditor:
         right_eyelashes = WORKDIR / "assets" / "right_eyelashes"
         self.add_to_catalog('right_eyelashes', right_eyelashes)
 
+        beard = WORKDIR / "assets" / "beard"
+        self.add_to_catalog('beard', beard)
+
+        left_ear = WORKDIR / "assets" / "left_ear"
+        self.add_to_catalog("left_ear", left_ear)
+
+        right_ear = WORKDIR / "assets" / "right_ear"
+        self.add_to_catalog("right_ear", right_ear)
+
+
         # If no images found, create a placeholder
         if not self.feature_catalog['eyes']:
             print("⚠ No eye images found in assets/eye_images/")
@@ -108,20 +118,6 @@ class CatalogEditor:
             draw.text((100, 50), "No images\nfound", fill=(100, 100, 100, 255), anchor="mm")
             self.feature_catalog['eyes']['Placeholder'] = placeholder
 
-        # BEARD VARIATIONS (synthetic for testing)
-        self.feature_catalog['beard'] = {}
-
-        beard1 = Image.new('RGBA', (180, 140), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(beard1)
-        draw.ellipse([30, 20, 150, 120], fill=(45, 28, 18, 220))
-        draw.ellipse([40, 10, 140, 100], fill=(55, 35, 22, 200))
-        self.feature_catalog['beard']['Full Beard'] = beard1
-
-        beard2 = Image.new('RGBA', (120, 100), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(beard2)
-        draw.ellipse([30, 30, 90, 90], fill=(45, 28, 18, 220))
-        draw.rectangle([45, 10, 75, 50], fill=(45, 28, 18, 220))
-        self.feature_catalog['beard']['Goatee'] = beard2
 
     def create_catalog_gallery(self, category):
         """Create a gallery of thumbnails for the selected category"""
@@ -630,7 +626,8 @@ def create_interface():
                 gr.Markdown("### 1. Select Category")
                 category_select = gr.Radio(
                     choices=["eyes", "mustache", "eyeglasses", "left_eyebrow", 'right_eyebrow', 'lips',
-                             'nose', 'left_dimples', 'right_dimples', 'ring', 'left_eyelashes', 'right_eyelashes'],  # Add more as needed
+                             'nose', 'left_dimples', 'right_dimples', 'ring', 'left_eyelashes', 'right_eyelashes',
+                             'beard', 'left_ear', 'right_ear'],  # Add more as needed
                     value="eyes",
                     label="Feature Category"
                 )
@@ -657,10 +654,10 @@ def create_interface():
 
                 scale_slider = gr.Slider(
                     minimum=0.02,
-                    maximum=0.5,
+                    maximum=0.7,
                     value=0.1,
                     step=0.01,
-                    label="📏 Size (0.01x - 0.5x) - DRAG TO SEE CHANGES!"
+                    label="📏 Size (0.01x - 0.7x) - DRAG TO SEE CHANGES!"
                 )
 
                 rotation_slider = gr.Slider(
