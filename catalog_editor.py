@@ -109,6 +109,8 @@ class CatalogEditor:
         right_ear = WORKDIR / "assets" / "right_ear"
         self.add_to_catalog("right_ear", right_ear)
 
+        haircut = WORKDIR / "assets" / "haircut"
+        self.add_to_catalog("haircut", haircut)
 
         # If no images found, create a placeholder
         if not self.feature_catalog['eyes']:
@@ -627,7 +629,7 @@ def create_interface():
                 category_select = gr.Radio(
                     choices=["eyes", "mustache", "eyeglasses", "left_eyebrow", 'right_eyebrow', 'lips',
                              'nose', 'left_dimples', 'right_dimples', 'ring', 'left_eyelashes', 'right_eyelashes',
-                             'beard', 'left_ear', 'right_ear'],  # Add more as needed
+                             'beard', 'left_ear', 'right_ear', 'haircut'],  # Add more as needed
                     value="eyes",
                     label="Feature Category"
                 )
@@ -654,10 +656,10 @@ def create_interface():
 
                 scale_slider = gr.Slider(
                     minimum=0.02,
-                    maximum=0.7,
+                    maximum=3.,
                     value=0.1,
                     step=0.01,
-                    label="📏 Size (0.01x - 0.7x) - DRAG TO SEE CHANGES!"
+                    label="📏 Size (0.01x - 3.x) - DRAG TO SEE CHANGES!"
                 )
 
                 rotation_slider = gr.Slider(
